@@ -36,21 +36,26 @@ class FlutterRingtonePlayer {
       {AndroidSound? android,
       IosSound? ios,
       String? fromAsset,
+      String? fromFile,
       double? volume,
       bool? looping,
       bool? asAlarm}) async {
-    if (fromAsset == null && android == null && ios == null) {
+    if ((fromAsset == null || fromFile == null) &&
+        android == null &&
+        ios == null) {
       throw "Please specify the sound source.";
     }
-    if (fromAsset == null) {
+    if (fromAsset == null && fromFile == null) {
       if (android == null) {
         throw "Please specify android sound.";
       }
       if (ios == null) {
         throw "Please specify ios sound.";
       }
+    } else if (fromFile != null && fromAsset == null) {
+      fromAsset = await _getFilePath(fromFile);
     } else {
-      fromAsset = await _generateAssetUri(fromAsset);
+      fromAsset = await _generateAssetUri(fromAsset!);
     }
     try {
       var args = <String, dynamic>{};
@@ -101,6 +106,22 @@ class FlutterRingtonePlayer {
     try {
       _channel.invokeMethod('stop');
     } on PlatformException {}
+  }
+
+  static Future<String> _getFilePath(String path) async {
+    if (Platform.isAndroid) {
+      // create a temporary file on the device to be read by the native side
+      final file = File('$path');
+      return file.uri.path;
+    } else if (Platform.isIOS) {
+      if (!['wav', 'mp3', 'aiff', 'caf']
+          .contains(path.split('.').last.toLowerCase())) {
+        throw 'Format not supported for iOS. Only mp3, wav, aiff and caf formats are supported.';
+      }
+      return path;
+    } else {
+      return path;
+    }
   }
 
   /// Generate asset uri according to platform.
